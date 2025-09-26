@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Trilhos e Vigas de Rolamento - NBR 7590</title>
+    <script src="https://cdn-tailwindcss.vercel.app/"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem;
+        }
+        .result-pass {
+            color: #16a34a; /* green-600 */
+            background-color: #f0fdf4; /* green-50 */
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-weight: 600;
+        }
+        .result-fail {
+            color: #dc2626; /* red-600 */
+            background-color: #fef2f2; /* red-50 */
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-weight: 600;
+        }
+        .label-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        label {
+            font-weight: 500;
+            color: #475569; /* slate-600 */
+        }
+        input, select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #cbd5e1; /* slate-300 */
+            border-radius: 0.375rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #2563eb; /* blue-600 */
+            box-shadow: 0 0 0 2px #bfdbfe; /* blue-200 */
+        }
+        .prop-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem;
+        }
+        .prop-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            padding: 0.25rem 0;
+        }
+        .prop-item span:first-child {
+            color: #64748b; /* slate-500 */
+        }
+        .prop-item span:last-child {
+            font-weight: 600;
+            color: #1e293b; /* slate-800 */
+        }
+        .diagram-canvas {
+            width: 100%;
+            height: 150px;
+            background-color: #f8fafc;
+            border-radius: 0.5rem;
+        }
+        .prose {
+             max-width: none;
+        }
+        .prose h3 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+         .prose p {
+            margin: 0;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body class="bg-slate-50">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-slate-800">Calculadora de Trilhos e Vigas de Rolamento</h1>
+            <p class="text-slate-600 mt-2">Verificação de perfis TR (NBR 7590) com metodologia da NBR 8800:2024</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Coluna de Entradas -->
+            <div class="lg:col-span-1 flex flex-col gap-6">
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-slate-700 mb-4">Dados da Viga e do Material</h2>
+                    <div class="space-y-4">
+                        <div class="label-group">
+                            <label for="profileSelect">Trilho (NBR 7590)</label>
+                            <select id="profileSelect"></select>
+                        </div>
+                        <div class="label-group">
+                            <label for="steelSelect">Aço Estrutural</label>
+                            <select id="steelSelect"></select>
+                        </div>
+                        <div class="label-group">
+                            <label for="beamSpanInput">Vão da Viga (L) [m]</label>
+                            <input type="number" id="beamSpanInput" value="5.0" min="0.1" step="0.1">
+                        </div>
+                        <div class="label-group">
+                            <label for="L_flambagem_input">Comprimento de Flambagem (Lk) [m]</label>
+                            <input type="number" id="L_flambagem_input" value="5.0" min="0.1" step="0.1" title="Usado apenas para a verificação à compressão axial.">
+                        </div>
+                        <div class="label-group">
+                            <label for="gammaA1Input">Coef. Ponderação Resistência (γₐ₁)</label>
+                            <input type="number" id="gammaA1Input" value="1.10" min="1.0" step="0.01">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-slate-700 mb-4">Carregamentos (Cargas de Cálculo)</h2>
+                    
+                    <div class="mb-4 p-3 border rounded-lg">
+                        <h3 class="font-semibold mb-2 text-slate-600">Carga Distribuída</h3>
+                        <div class="grid grid-cols-3 gap-2">
+                             <div class="label-group text-sm">
+                                <label for="distLoadValue">Valor (kN/m)</label>
+                                <input type="number" id="distLoadValue" value="10" min="0">
+                            </div>
+                            <div class="label-group text-sm">
+                                <label for="distLoadStart">Início (m)</label>
+                                <input type="number" id="distLoadStart" value="0" min="0">
+                            </div>
+                            <div class="label-group text-sm">
+                                <label for="distLoadEnd">Fim (m)</label>
+                                <input type="number" id="distLoadEnd" value="5" min="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 border rounded-lg">
+                        <h3 class="font-semibold mb-2 text-slate-600">Cargas Concentradas</h3>
+                        <div id="concentratedLoadsContainer" class="space-y-2">
+                        </div>
+                        <button id="addConcLoadBtn" class="mt-3 w-full bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition duration-300 text-sm">
+                            + Adicionar Carga
+                        </button>
+                    </div>
+                    
+                    <div class="mt-4 p-3 border rounded-lg">
+                         <h3 class="font-semibold mb-2 text-slate-600">Carga Axial</h3>
+                         <div class="label-group text-sm">
+                            <label for="Nsd_input">Força Axial de Compressão (N<sub>sd</sub>) [kN]</label>
+                            <input type="number" id="Nsd_input" value="0" min="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna de Resultados -->
+            <div class="lg:col-span-2 flex flex-col gap-6">
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-slate-700 mb-4">Representação Gráfica da Viga</h2>
+                    <canvas id="beamCanvas" class="diagram-canvas"></canvas>
+                </div>
+
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-slate-700 mb-4">Diagramas de Esforços Solicitantes</h2>
+                    <div class="space-y-6">
+                        <div>
+                            <h3 class="text-md font-medium text-slate-600 mb-2">Diagrama de Força Cortante (Vsd)</h3>
+                            <canvas id="shearDiagramCanvas" class="diagram-canvas"></canvas>
+                        </div>
+                        <div>
+                            <h3 class="text-md font-medium text-slate-600 mb-2">Diagrama de Momento Fletor (Msd)</h3>
+                            <canvas id="momentDiagramCanvas" class="diagram-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                 <div class="card">
+                    <h2 class="text-xl font-semibold text-slate-700 mb-4">Propriedades Geométricas do Trilho</h2>
+                    <div id="profileProperties" class="prop-grid"></div>
+                </div>
+                
+                 <div class="card">
+                    <h2 class="text-xl font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600"><path d="M12 3c-1.2 0-2.4.6-3 1.7A3.4 3.4 0 0 0 6 8c0 1.6 1.1 3 2.6 3.4.2.8.6 1.5 1.2 2.1.6.6 1.3 1 2.1 1.2.4 1.5 1.8 2.6 3.4 2.6 1.1 0 2.1-.5 2.8-1.3.7-.8 1-2 1-3.2 0-1.8-1.4-3.3-3.2-3.3-1 0-1.9.5-2.5 1.2-.6-.6-1-1.3-1.2-2.1C8.1 11 7 9.6 7 8c0-.9.4-1.8 1-2.4.7-.6 1.5-1 2.5-1.2A3.4 3.4 0 0 0 15 3c.9 0 1.8.4 2.4 1 .6.7 1 1.5 1.2 2.5.1.5.2 1 .2 1.5 0 1.1-.5 2.1-1.3 2.8-.8.7-2 1.2-3.2 1.2s-2.4-.5-3.2-1.2c-.8-.7-1.3-1.7-1.3-2.8 0-.5.1-1 .2-1.5.3-1 .7-1.8 1.2-2.5.7-.6 1.5-1 2.4-1z"/></svg>
+                        Análises e Relatórios
+                    </h2>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button id="suggestProfileBtn" class="hidden w-full flex-1 bg-amber-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-amber-600 transition duration-300 text-sm flex items-center justify-center gap-2">
+                            Sugerir Perfil (IA)
+                        </button>
+                        <button id="generateReportBtn" class="w-full flex-1 bg-sky-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-700 transition duration-300 text-sm flex items-center justify-center gap-2">
+                           Gerar Memorial
+                        </button>
+                    </div>
+                    <div id="geminiOutput" class="mt-4 p-4 bg-slate-100 rounded-lg hidden">
+                        <div id="geminiLoader" class="hidden text-center">
+                            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-slate-500"></div>
+                            <p class="text-sm text-slate-500 mt-2">Analisando...</p>
+                        </div>
+                        <div id="geminiResult" class="text-sm text-slate-800 prose"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-slate-700 mb-4">Resultados das Verificações</h2>
+                    <div class="p-4 rounded-lg bg-blue-50 border border-blue-200 mb-4">
+                        <h3 class="font-semibold text-blue-800">Esforços Máximos Calculados</h3>
+                        <div class="flex justify-around mt-2">
+                            <p class="text-sm text-slate-600">Momento Fletor Máx: <strong id="maxMomentResult" class="text-blue-700">0.00 kNm</strong></p>
+                            <p class="text-sm text-slate-600">Força Cortante Máx: <strong id="maxShearResult" class="text-blue-700">0.00 kN</strong></p>
+                        </div>
+                    </div>
+                    <div id="results" class="space-y-4">
+                         <p class="text-slate-500">Os resultados das verificações aparecerão aqui.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // DATA: Trilhos TR (NBR 7590) e Aços
+        const profileData = {
+            "TR-32": { d: 120.65, b_base: 107.95, b_boleto: 58.74, tw: 12.7, A: 40.88, Ix: 774, Wx_sup: 128, Wx_inf: 144, Iy: 151 },
+            "TR-37": { d: 130.18, b_base: 114.30, b_boleto: 61.91, tw: 13.1, A: 47.38, Ix: 1024, Wx_sup: 157, Wx_inf: 176, Iy: 183 },
+            "TR-45": { d: 142.88, b_base: 122.24, b_boleto: 66.68, tw: 14.29, A: 56.88, Ix: 1508, Wx_sup: 211, Wx_inf: 232, Iy: 246 },
+            "TR-50": { d: 152.40, b_base: 127.00, b_boleto: 68.26, tw: 15.08, A: 64.16, Ix: 1836, Wx_sup: 233, Wx_inf: 250, Iy: 316 },
+            "TR-57": { d: 155.58, b_base: 131.76, b_boleto: 69.85, tw: 15.88, A: 72.53, Ix: 2347, Wx_sup: 289, Wx_inf: 313, Iy: 382 },
+            "TR-68": { d: 172.00, b_base: 152.40, b_boleto: 74.63, tw: 19.05, A: 86.67, Ix: 3351, Wx_sup: 370, Wx_inf: 410, Iy: 558 }
+        };
+
+        const steelData = {
+            "Aço para Trilhos (UIC 860V)": { fy: 700, fu: 880 },
+            "MR250 (A36)": { fy: 250, fu: 400 },
+            "AR350 (A572 G50)": { fy: 345, fu: 450 },
+        };
+
+        // CONSTANTS (NBR 8800:2024)
+        const E_aco = 200000; // MPa
+        
+        // UI ELEMENTS
+        const profileSelect = document.getElementById('profileSelect');
+        const steelSelect = document.getElementById('steelSelect');
+        const resultsDiv = document.getElementById('results');
+        const profilePropertiesDiv = document.getElementById('profileProperties');
+        const beamSpanInput = document.getElementById('beamSpanInput');
+        const addConcLoadBtn = document.getElementById('addConcLoadBtn');
+        const concentratedLoadsContainer = document.getElementById('concentratedLoadsContainer');
+        const beamCanvas = document.getElementById('beamCanvas');
+        const beamCtx = beamCanvas.getContext('2d');
+        const shearCanvas = document.getElementById('shearDiagramCanvas');
+        const shearCtx = shearCanvas.getContext('2d');
+        const momentCanvas = document.getElementById('momentDiagramCanvas');
+        const momentCtx = momentCanvas.getContext('2d');
+        const maxMomentResult = document.getElementById('maxMomentResult');
+        const maxShearResult = document.getElementById('maxShearResult');
+        const suggestProfileBtn = document.getElementById('suggestProfileBtn');
+        const generateReportBtn = document.getElementById('generateReportBtn');
+        const geminiOutput = document.getElementById('geminiOutput');
+        const geminiLoader = document.getElementById('geminiLoader');
+        const geminiResult = document.getElementById('geminiResult');
+        const gammaA1Input = document.getElementById('gammaA1Input');
+        const Nsd_input = document.getElementById('Nsd_input');
+        const L_flambagem_input = document.getElementById('L_flambagem_input');
+
+        let concLoadId = 0;
+        let effortData = {};
+        let lastVerificationResults = {};
+
+        // INITIALIZATION
+        function init() {
+            Object.keys(profileData).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                profileSelect.appendChild(option);
+            });
+            Object.keys(steelData).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                steelSelect.appendChild(option);
+            });
+            profileSelect.value = "TR-45";
+            steelSelect.value = "Aço para Trilhos (UIC 860V)";
+            addConcLoad();
+            updateAll();
+        }
+
+        function addConcLoad() {
+            concLoadId++;
+            const loadDiv = document.createElement('div');
+            loadDiv.id = `conc_load_${concLoadId}`;
+            loadDiv.className = 'grid grid-cols-12 gap-2 items-center';
+            loadDiv.innerHTML = `
+                <div class="label-group text-sm col-span-5">
+                    <label for="concLoadValue_${concLoadId}">Valor (kN)</label>
+                    <input type="number" id="concLoadValue_${concLoadId}" value="20" min="0" class="load-input">
+                </div>
+                <div class="label-group text-sm col-span-5">
+                    <label for="concLoadPos_${concLoadId}">Posição (m)</label>
+                    <input type="number" id="concLoadPos_${concLoadId}" value="2.5" min="0" class="load-input">
+                </div>
+                <div class="col-span-2 pt-5">
+                    <button class="remove-load-btn w-full bg-red-500 text-white font-bold py-1.5 rounded hover:bg-red-600" data-id="${concLoadId}">X</button>
+                </div>`;
+            concentratedLoadsContainer.appendChild(loadDiv);
+            loadDiv.querySelectorAll('.load-input').forEach(input => input.addEventListener('input', updateAll));
+        }
+
+        function updateProfileProperties() {
+            const p = profileData[profileSelect.value];
+            const rx = Math.sqrt(p.Ix / p.A).toFixed(2);
+            const ry = Math.sqrt(p.Iy / p.A).toFixed(2);
+            const Zx_est = (p.Wx_sup * 1.15).toFixed(0);
+            profilePropertiesDiv.innerHTML = `
+                <div class="prop-item"><span>Altura (d)</span> <span>${p.d} mm</span></div>
+                <div class="prop-item"><span>Largura Base (b)</span> <span>${p.b_base} mm</span></div>
+                <div class="prop-item"><span>Largura Boleto (b')</span> <span>${p.b_boleto} mm</span></div>
+                <div class="prop-item"><span>Espessura Alma (t<sub>w</sub>)</span> <span>${p.tw} mm</span></div>
+                <div class="prop-item"><span>Área (A)</span> <span>${p.A} cm²</span></div>
+                <div class="prop-item"><span>I<sub>x</sub></span> <span>${p.Ix} cm⁴</span></div>
+                <div class="prop-item"><span>W<sub>x, sup</sub></span> <span>${p.Wx_sup} cm³</span></div>
+                <div class="prop-item"><span>W<sub>x, inf</sub></span> <span>${p.Wx_inf} cm³</span></div>
+                <div class="prop-item"><span>I<sub>y</sub></span> <span>${p.Iy} cm⁴</span></div>
+                <div class="prop-item"><span>r<sub>x</sub></span> <span>${rx} cm</span></div>
+                <div class="prop-item"><span>r<sub>y</sub></span> <span>${ry} cm</span></div>
+                <div class="prop-item"><span>Z<sub>x, est</sub></span> <span>${Zx_est} cm³</span></div>`;
+        }
+
+        function calculateEfforts() {
+            const L = parseFloat(beamSpanInput.value);
+            const distLoad = {
+                value: parseFloat(document.getElementById('distLoadValue').value) || 0,
+                start: parseFloat(document.getElementById('distLoadStart').value) || 0,
+                end: parseFloat(document.getElementById('distLoadEnd').value) || 0,
+            };
+            const concLoads = Array.from(document.querySelectorAll('[id^="conc_load_"]')).map(div => {
+                const id = div.id.split('_')[2];
+                return {
+                    value: parseFloat(document.getElementById(`concLoadValue_${id}`).value) || 0,
+                    pos: parseFloat(document.getElementById(`concLoadPos_${id}`).value) || 0,
+                };
+            });
+
+            if (L <= 0) return { maxMoment: 0, maxShear: 0, RA: 0, RB: 0, distLoad, concLoads, L, shearData: [], momentData: [] };
+
+            let RA = 0, RB = 0;
+            if (distLoad.value > 0) {
+                const q = distLoad.value;
+                const a = distLoad.start;
+                const b = distLoad.end;
+                const totalLoad = q * (b - a);
+                const loadCenter = a + (b - a) / 2;
+                RA += totalLoad * (L - loadCenter) / L;
+                RB += totalLoad * loadCenter / L;
+            }
+            concLoads.forEach(P => {
+                if (P.value > 0) {
+                    RA += P.value * (L - P.pos) / L;
+                    RB += P.value * P.pos / L;
+                }
+            });
+
+            const getShearAt = (x) => {
+                let shear = RA;
+                if (distLoad.value > 0 && x > distLoad.start) {
+                    shear -= distLoad.value * (Math.min(x, distLoad.end) - distLoad.start);
+                }
+                concLoads.forEach(P => {
+                    if (x >= P.pos) shear -= P.value;
+                });
+                return shear;
+            };
+            const getMomentAt = (x) => {
+                let moment = RA * x;
+                if (distLoad.value > 0 && x > distLoad.start) {
+                    const end = Math.min(x, distLoad.end);
+                    const length = end - distLoad.start;
+                    moment -= distLoad.value * length * (x - (distLoad.start + length / 2));
+                }
+                concLoads.forEach(P => {
+                    if (x > P.pos) moment -= P.value * (x - P.pos);
+                });
+                return moment;
+            };
+
+            const steps = 500;
+            const shearData = [], momentData = [];
+            let maxMoment = 0, maxAbsShear = 0;
+            for (let i = 0; i <= steps; i++) {
+                const x = (L / steps) * i;
+                const shear = getShearAt(x);
+                const moment = getMomentAt(x);
+                shearData.push({ x, v: shear });
+                momentData.push({ x, m: moment });
+                maxMoment = Math.max(maxMoment, moment);
+                maxAbsShear = Math.max(maxAbsShear, Math.abs(shear));
+            }
+            
+            return { maxMoment, maxShear: maxAbsShear, RA, RB, distLoad, concLoads, L, shearData, momentData };
+        }
+        
+        function verifyProfile(effortData) {
+            const { maxMoment, maxShear } = effortData;
+            maxMomentResult.textContent = `${maxMoment.toFixed(2)} kNm`;
+            maxShearResult.textContent = `${maxShear.toFixed(2)} kN`;
+
+            const p = profileData[profileSelect.value];
+            const s = steelData[steelSelect.value];
+            const M_sd = maxMoment * 1e6;
+            const V_sd = maxShear * 1e3;
+            const N_sd = parseFloat(Nsd_input.value) * 1e3;
+            const L_flambagem = parseFloat(L_flambagem_input.value) * 1000;
+            const gamma_a1 = parseFloat(gammaA1Input.value) || 1.10;
+            
+            const Zx_est = p.Wx_sup * 1.15;
+            const M_rd = (Zx_est * 1000 * s.fy) / gamma_a1;
+            const Aw = p.d * p.tw;
+            const V_rd = (0.6 * Aw * s.fy) / gamma_a1;
+            
+            let N_rd = 0;
+            let lambda_max = 0, Ne = 0, lambda_0 = 0, chi = 0;
+            if (N_sd > 0) {
+                const A_g = p.A * 100;
+                const r_min_mm = Math.sqrt(p.Iy / p.A) * 10;
+                lambda_max = L_flambagem / r_min_mm;
+                Ne = (Math.pow(Math.PI, 2) * E_aco * A_g) / Math.pow(lambda_max, 2);
+                lambda_0 = Math.sqrt((A_g * s.fy) / Ne);
+                chi = (lambda_0 <= 1.5) ? Math.pow(0.658, Math.pow(lambda_0, 2)) : 0.877 / Math.pow(lambda_0, 2);
+                N_rd = (chi * A_g * s.fy) / gamma_a1;
+            }
+
+            let interaction_value = 0;
+            if (N_sd > 0 && M_sd > 0 && N_rd > 0) {
+                 const N_ratio = N_sd / N_rd;
+                 const M_ratio = M_sd / M_rd;
+                 interaction_value = (N_ratio >= 0.2) ? N_ratio + (8/9) * M_ratio : N_ratio / 2 + M_ratio;
+            }
+            
+            lastVerificationResults = { M_sd, M_rd, V_sd, V_rd, N_sd, N_rd, interaction_value, interaction_limit: 1.0, Zx_est, Aw, lambda_max, Ne, lambda_0, chi };
+            displayResults(lastVerificationResults);
+        }
+        
+        function displayResults(data) {
+            const { M_sd, M_rd, V_sd, V_rd, N_sd, N_rd, interaction_value, interaction_limit } = data;
+            
+            const M_ok = M_sd <= M_rd;
+            const V_ok = V_sd <= V_rd;
+            const N_ok = N_sd === 0 || (N_rd > 0 && N_sd <= N_rd);
+            const I_ok = interaction_value === 0 || interaction_value <= interaction_limit;
+            const overall_ok = M_ok && V_ok && N_ok && I_ok;
+            
+            lastVerificationResults.M_ok = M_ok;
+            lastVerificationResults.V_ok = V_ok;
+            lastVerificationResults.N_ok = N_ok;
+            lastVerificationResults.I_ok = I_ok;
+            lastVerificationResults.overall_ok = overall_ok;
+            
+            suggestProfileBtn.classList.toggle('hidden', overall_ok);
+
+            let resultsHTML = `<div class="p-4 rounded-lg ${overall_ok ? 'bg-green-100' : 'bg-red-100'}"><h3 class="text-lg font-bold ${overall_ok ? 'text-green-800' : 'text-red-800'}">Resultado Final</h3><p class="text-2xl font-bold ${overall_ok ? 'text-green-600' : 'text-red-600'}">${overall_ok ? 'APROVADO' : 'REPROVADO'}</p></div>`;
+            resultsHTML += createResultCard('Verificação à Flexão (Travado Lateralmente)', M_sd / 1e6, M_rd / 1e6, 'kNm', M_ok);
+            resultsHTML += createResultCard('Verificação ao Cisalhamento', V_sd / 1e3, V_rd / 1e3, 'kN', V_ok);
+            if (N_sd > 0) resultsHTML += createResultCard('Verificação à Compressão Axial', N_sd / 1e3, N_rd > 0 ? N_rd / 1e3 : 0, 'kN', N_ok);
+            if (interaction_value > 0) resultsHTML += createResultCard('Verificação à Flexo-Compressão', interaction_value, interaction_limit, '', I_ok, true);
+
+            resultsDiv.innerHTML = resultsHTML;
+        }
+
+        function createResultCard(title, solicitante, resistente, unit, isOk, isInteraction = false) {
+             const ratio = resistente > 0 ? solicitante / resistente : 0;
+             const percentage = ratio * 100;
+             const barWidth = Math.min(percentage, 100);
+             return `<div class="border border-slate-200 rounded-lg p-4"><div class="flex justify-between items-center mb-3"><h4 class="font-semibold text-slate-700">${title}</h4><span class="${isOk ? 'result-pass' : 'result-fail'}">${isOk ? 'APROVADO' : 'REPROVADO'}</span></div><div class="space-y-2 text-sm"><div class="flex justify-between"><span class="text-slate-500">Solicitante (S<sub>d</sub>)</span><span class="font-semibold">${solicitante.toFixed(isInteraction ? 3 : 2)} ${unit}</span></div><div class="flex justify-between"><span class="text-slate-500">Resistente (R<sub>d</sub>)</span><span class="font-semibold">${resistente.toFixed(isInteraction ? 3 : 2)} ${unit}</span></div></div><div class="mt-3"><div class="w-full bg-slate-200 rounded-full h-2.5"><div class="${isOk ? 'bg-green-500' : 'bg-red-500'}" style="width: ${barWidth}%"></div></div><p class="text-right text-xs mt-1 font-medium ${isOk ? 'text-slate-600' : 'text-red-600'}">Utilização: ${percentage.toFixed(1)}%</p></div></div>`;
+        }
+        
+        function drawBeam(effortData) {
+            const { RA, RB, distLoad, concLoads, L } = effortData;
+            const canvas = beamCanvas; const ctx = beamCtx;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (L <= 0) return;
+            const margin = 40; const scaleX = (canvas.width - 2 * margin) / L; const beamY = canvas.height - 50;
+            ctx.beginPath(); ctx.moveTo(margin, beamY); ctx.lineTo(canvas.width - margin, beamY); ctx.strokeStyle = '#334155'; ctx.lineWidth = 3; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(margin, beamY); ctx.lineTo(margin - 10, beamY + 15); ctx.lineTo(margin + 10, beamY + 15); ctx.closePath(); ctx.stroke(); ctx.fillText(`${RA.toFixed(1)} kN`, margin - 10, beamY + 35);
+            ctx.beginPath(); ctx.moveTo(canvas.width - margin, beamY); ctx.lineTo(canvas.width - margin - 10, beamY + 15); ctx.lineTo(canvas.width - margin + 10, beamY + 15); ctx.closePath(); ctx.stroke(); ctx.beginPath(); ctx.arc(canvas.width - margin, beamY + 18, 3, 0, 2 * Math.PI); ctx.stroke(); ctx.fillText(`${RB.toFixed(1)} kN`, canvas.width - margin - 10, beamY + 35);
+            const loadHeight = 30; ctx.fillStyle = 'rgba(37, 99, 235, 0.5)'; ctx.strokeStyle = '#1e3a8a'; ctx.lineWidth = 1;
+            if (distLoad.value > 0) {
+                const startX = margin + distLoad.start * scaleX; const endX = margin + distLoad.end * scaleX;
+                ctx.fillRect(startX, beamY - loadHeight - 10, endX - startX, loadHeight);
+                for(let x = startX; x <= endX; x += 20) { ctx.beginPath(); ctx.moveTo(x, beamY - 10); ctx.lineTo(x, beamY); ctx.stroke(); }
+                ctx.fillStyle = '#1e293b'; ctx.fillText(`${distLoad.value} kN/m`, startX + 5, beamY - loadHeight - 15);
+            }
+            concLoads.forEach(P => {
+                if (P.value > 0) {
+                    const posX = margin + P.pos * scaleX;
+                    ctx.beginPath(); ctx.moveTo(posX, beamY - 50); ctx.lineTo(posX, beamY); ctx.lineTo(posX - 5, beamY - 10); ctx.moveTo(posX, beamY); ctx.lineTo(posX + 5, beamY - 10);
+                    ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.fillStyle = '#1e293b'; ctx.fillText(`${P.value} kN`, posX + 8, beamY - 55);
+                }
+            });
+        }
+        
+        function drawDiagrams(effortData) {
+            const { L, shearData, momentData } = effortData;
+            // Resize Canvases
+            const rect = shearCanvas.parentElement.getBoundingClientRect();
+            [shearCanvas, momentCanvas].forEach(c => { c.width = rect.width; c.height = 150; });
+            // Draw
+            drawSingleDiagram(shearCtx, shearData.map(d => ({x: d.x, y: d.v})), L, "kN", false);
+            drawSingleDiagram(momentCtx, momentData.map(d => ({x: d.x, y: d.m})), L, "kNm", true);
+        }
+
+        function drawSingleDiagram(ctx, data, L, unit, positiveDown) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            if (!data || data.length === 0 || L <= 0) return;
+
+            const margin = { top: 20, bottom: 20, left: 40, right: 20 };
+            const width = ctx.canvas.width - margin.left - margin.right;
+            const height = ctx.canvas.height - margin.top - margin.bottom;
+            
+            const values = data.map(d => d.y);
+            const absMax = Math.max(...values.map(Math.abs), 0);
+            
+            if (absMax < 1e-6) {
+                const zeroY = ctx.canvas.height / 2;
+                ctx.beginPath();
+                ctx.moveTo(margin.left, zeroY);
+                ctx.lineTo(margin.left + width, zeroY);
+                ctx.strokeStyle = '#94a3b8';
+                ctx.stroke();
+                ctx.fillStyle = "#1e293b";
+                ctx.font = "12px Inter";
+                ctx.fillText("0", margin.left - 20, zeroY + 3);
+                return;
+            }
+
+            const scaleX = width / L;
+            const scaleY = (height / 2) / absMax;
+            const zeroY = ctx.canvas.height / 2;
+            
+            // Draw axis
+            ctx.beginPath();
+            ctx.moveTo(margin.left, zeroY);
+            ctx.lineTo(margin.left + width, zeroY);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.stroke();
+            ctx.fillStyle = "#1e293b";
+            ctx.font = "12px Inter";
+            ctx.fillText("0", margin.left - 20, zeroY + 3);
+            
+            // Draw diagram path
+            ctx.beginPath();
+            // Multiplier inverts Y-axis for moment diagram (positive down)
+            const yMultiplier = positiveDown ? 1 : -1;
+            ctx.moveTo(margin.left, zeroY + yMultiplier * data[0].y * scaleY);
+
+            data.forEach(d => {
+                ctx.lineTo(margin.left + d.x * scaleX, zeroY + yMultiplier * d.y * scaleY);
+            });
+            
+            ctx.lineTo(margin.left + L * scaleX, zeroY);
+            ctx.lineTo(margin.left, zeroY);
+            ctx.closePath();
+            
+            // Fill and Stroke
+            ctx.fillStyle = 'rgba(37, 99, 235, 0.2)';
+            ctx.fill();
+            ctx.strokeStyle = '#1d4ed8';
+            ctx.stroke();
+
+            // Annotate max and min values
+            const maxPoint = data.reduce((prev, curr) => (prev.y > curr.y) ? prev : curr);
+            const minPoint = data.reduce((prev, curr) => (prev.y < curr.y) ? prev : curr);
+
+            ctx.fillStyle = "#1e293b";
+            
+            if (Math.abs(maxPoint.y) > 0.01) {
+                const plotY = zeroY + yMultiplier * maxPoint.y * scaleY;
+                ctx.fillText(`${maxPoint.y.toFixed(2)} ${unit}`, margin.left + maxPoint.x * scaleX + 5, plotY + (positiveDown ? 15 : -5));
+            }
+            if (Math.abs(minPoint.y) > 0.01) {
+                const plotY = zeroY + yMultiplier * minPoint.y * scaleY;
+                ctx.fillText(`${minPoint.y.toFixed(2)} ${unit}`, margin.left + minPoint.x * scaleX + 5, plotY + (positiveDown ? -5 : 15));
+            }
+        }
+
+        function updateAll() {
+            updateProfileProperties();
+            effortData = calculateEfforts();
+            verifyProfile(effortData);
+            drawBeam(effortData);
+            drawDiagrams(effortData);
+        }
+
+        async function callGeminiAPI(geminiPrompt, systemPrompt) {
+            geminiOutput.classList.remove('hidden');
+            geminiLoader.classList.remove('hidden');
+            geminiResult.innerHTML = '';
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ parts: [{ text: geminiPrompt }] }] };
+            if (systemPrompt) payload.systemInstruction = { parts: [{ text: systemPrompt }] };
+            try {
+                let response; let delay = 1000;
+                for (let i = 0; i < 5; i++) {
+                    response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (response.ok) break;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    let htmlResult = candidate.content.parts[0].text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+                    geminiResult.innerHTML = htmlResult;
+                } else { geminiResult.textContent = 'Não foi possível obter uma resposta da IA.'; }
+            } catch (error) { console.error("Erro API Gemini:", error); geminiResult.textContent = 'Ocorreu um erro ao comunicar com a IA.';
+            } finally { geminiLoader.classList.add('hidden'); }
+        }
+
+        function handleSuggestProfile() {
+            const { maxMoment, maxShear } = effortData;
+            const M_rd_nec = maxMoment * 1e6;
+            const V_rd_nec = maxShear * 1e3;
+            const currentProfileName = profileSelect.value;
+            const steelName = steelSelect.value;
+            const s = steelData[steelName];
+            const currentGammaA1 = parseFloat(gammaA1Input.value) || 1.10;
+
+            let profilesForPrompt = "Perfis disponíveis e suas propriedades (Área [cm²], d [mm], tw [mm], Wx_sup [cm³]):\n";
+            Object.entries(profileData).forEach(([name, props]) => {
+                profilesForPrompt += `- ${name}: A=${props.A}, d=${props.d}, tw=${props.tw}, Wx_sup=${props.Wx_sup}\n`;
+            });
+
+            const systemPrompt = "Você é um consultor de estruturas especialista em perfis de aço, focado em otimização e segurança de acordo com a NBR 8800. Forneça respostas concisas e diretas.";
+            
+            const geminiPrompt = `
+O perfil de trilho ${currentProfileName} foi reprovado.
+**Esforços Resistentes Necessários (Rd):**
+- Momento Fletor (M_rd): ${(M_rd_nec / 1e6).toFixed(2)} kNm
+- Força Cortante (V_rd): ${(V_rd_nec / 1e3).toFixed(2)} kN
+
+**Dados do Aço:**
+- Aço ${steelName} (fy = ${s.fy} MPa)
+- gamma_a1 = ${currentGammaA1}
+
+**Tarefa:**
+Com base na lista de perfis de trilho (TR) abaixo, encontre o perfil mais leve (menor Área) que atende SIMULTANEAMENTE aos requisitos de Momento Fletor e Força Cortante.
+Para cada perfil da lista, calcule:
+1.  Mr,d = (Wx_sup * 1.15 * 1000 * fy) / gamma_a1
+2.  Vr,d = (0.6 * d * tw * fy) / gamma_a1
+
+Compare Mr,d (em N.mm) com ${M_rd_nec.toExponential(2)} N.mm e Vr,d (em N) com ${V_rd_nec.toExponential(2)} N.
+Apresente a sua sugestão final em negrito, seguida por uma breve justificativa mostrando os cálculos de verificação (Mr,d e Vr,d) para o perfil sugerido.
+
+${profilesForPrompt}
+`;
+            callGeminiAPI(geminiPrompt, systemPrompt);
+        }
+
+        function generateMemorialText() {
+            const { maxMoment, maxShear, L } = effortData;
+            const profileName = profileSelect.value;
+            const steelName = steelSelect.value;
+            const s = steelData[steelName];
+            const p = profileData[profileName];
+            const r = lastVerificationResults;
+            const gamma_a1 = parseFloat(gammaA1Input.value) || 1.10;
+            
+            let memorial = `<h3>1. Objetivo</h3>
+            <p>Verificação de um perfil de trilho ${profileName} utilizado como viga biapoiada, com base nos critérios da ABNT NBR 8800:2024.</p>
+            
+            <h3>2. Dados de Entrada</h3>
+            <p><strong>Perfil:</strong> ${profileName}</p>
+            <p><strong>Aço:</strong> ${steelName} (f<sub>y</sub> = ${s.fy} MPa)</p>
+            <p><strong>Vão da Viga (L):</strong> ${L} m</p>
+            <p><strong>Comprimento de Flambagem (Lk):</strong> ${L_flambagem_input.value} m</p>
+            <p><strong>Coef. Ponderação (γ<sub>a1</sub>):</strong> ${gamma_a1}</p>
+            
+            <h3>3. Esforços Máximos de Cálculo</h3>
+            <p>Momento Fletor (M<sub>sd,x</sub>): ${maxMoment.toFixed(2)} kNm</p>
+            <p>Força Cortante (V<sub>sd</sub>): ${maxShear.toFixed(2)} kN</p>
+            <p>Força Axial de Compressão (N<sub>sd</sub>): ${(r.N_sd/1e3).toFixed(2)} kN</p>
+            
+            <h3>4. Verificações Detalhadas</h3>
+            
+            <h4>4.1 Verificação à Flexão (Viga Travada)</h4>
+            <p>Fórmula: M<sub>rd</sub> = (Z<sub>x</sub> &middot; f<sub>y</sub>) / γ<sub>a1</sub></p>
+            <p>Cálculo: M<sub>rd</sub> = (${r.Zx_est.toFixed(0)} cm³ &middot; 1000 &middot; ${s.fy} MPa) / ${gamma_a1} = ${(r.M_rd/1e6).toFixed(2)} kNm</p>
+            <p><i>Nota: Módulo plástico Zx estimado como 1.15 &middot; Wx.</i></p>
+
+            <h4>4.2 Verificação ao Cisalhamento</h4>
+            <p>Fórmula: V<sub>rd</sub> = (0.6 &middot; A<sub>w</sub> &middot; f<sub>y</sub>) / γ<sub>a1</sub></p>
+            <p>Área da alma (A<sub>w</sub>) = d &middot; t<sub>w</sub> = ${p.d} mm &middot; ${p.tw} mm = ${r.Aw.toFixed(0)} mm²</p>
+            <p>Cálculo: V<sub>rd</sub> = (0.6 &middot; ${r.Aw.toFixed(0)} mm² &middot; ${s.fy} MPa) / ${gamma_a1} = ${(r.V_rd/1e3).toFixed(2)} kN</p>`;
+
+            if (r.N_sd > 0) {
+                 memorial += `<h4>4.3 Verificação à Compressão Axial</h4>
+                 <p>Esbeltez Máxima (λ) = Lk / r<sub>min</sub> = ${L_flambagem_input.value * 100} cm / ${(Math.sqrt(p.Iy / p.A)).toFixed(2)} cm = ${r.lambda_max.toFixed(2)}</p>
+                 <p>Força de Flambagem Elástica (N<sub>e</sub>) = (&pi;² &middot; E &middot; A<sub>g</sub>) / λ² = ${r.Ne > 0 ? (r.Ne / 1e3).toFixed(2) : 'N/A'} kN</p>
+                 <p>Esbeltez Reduzida (λ<sub>0</sub>) = &radic;((A<sub>g</sub> &middot; f<sub>y</sub>) / N<sub>e</sub>) = ${r.lambda_0 > 0 ? r.lambda_0.toFixed(3) : 'N/A'}</p>
+                 <p>Fator de Redução (χ) = ${r.chi.toFixed(3)}</p>
+                 <p>Fórmula: N<sub>rd</sub> = (&chi; &middot; A<sub>g</sub> &middot; f<sub>y</sub>) / γ<sub>a1</sub></p>
+                 <p>Cálculo: N<sub>rd</sub> = (${r.chi.toFixed(3)} &middot; ${p.A*100} mm² &middot; ${s.fy} MPa) / ${gamma_a1} = ${(r.N_rd/1e3).toFixed(2)} kN</p>`;
+            }
+             if (r.interaction_value > 0) {
+                 const n_ratio = r.N_sd / r.N_rd;
+                 const formula = n_ratio >= 0.2 ? "N<sub>sd</sub>/N<sub>rd</sub> + 8/9 &middot; M<sub>sd</sub>/M<sub>rd</sub> ≤ 1.0" : "N<sub>sd</sub>/(2&middot;N<sub>rd</sub>) + M<sub>sd</sub>/M<sub>rd</sub> ≤ 1.0";
+                 memorial += `<h4>4.4 Verificação à Flexo-Compressão</h4>
+                 <p>Fórmula de Interação: ${formula}</p>
+                 <p>Cálculo: ${r.interaction_value.toFixed(3)} ≤ 1.0</p>`;
+            }
+
+            memorial += `<h3>5. Resumo dos Resultados</h3>
+            <p><strong>Flexão:</strong> ${r.M_ok ? "APROVADO" : "REPROVADO"} (Utilização: ${(r.M_sd/r.M_rd * 100).toFixed(1)}%)</p>
+            <p><strong>Cisalhamento:</strong> ${r.V_ok ? "APROVADO" : "REPROVADO"} (Utilização: ${(r.V_sd/r.V_rd * 100).toFixed(1)}%)</p>`;
+            if (r.N_sd > 0) {
+                memorial += `<p><strong>Compressão Axial:</strong> ${r.N_ok ? "APROVADO" : "REPROVADO"} (Utilização: ${(r.N_sd/r.N_rd * 100).toFixed(1)}%)</p>`;
+            }
+            if (r.interaction_value > 0) {
+                memorial += `<p><strong>Flexo-Compressão:</strong> ${r.I_ok ? "APROVADO" : "REPROVADO"} (Utilização: ${(r.interaction_value/1.0 * 100).toFixed(1)}%)</p>`;
+            }
+
+            memorial += `<h3>6. Conclusão</h3>
+            <p>O perfil <strong>${profileName}</strong> foi considerado <strong>${r.overall_ok ? "APROVADO" : "REPROVADO"}</strong> para os carregamentos e condições especificadas.</p>`;
+
+            return memorial;
+        }
+
+        function handleGenerateReport() {
+            geminiOutput.classList.remove('hidden');
+            geminiLoader.classList.remove('hidden');
+            geminiResult.innerHTML = '';
+            
+            setTimeout(() => {
+                const memorialText = generateMemorialText();
+                geminiResult.innerHTML = memorialText;
+                geminiLoader.classList.add('hidden');
+            }, 100); // Small delay to show loader
+        }
+
+        // EVENT LISTENERS
+        document.addEventListener('DOMContentLoaded', init);
+        
+        addConcLoadBtn.addEventListener('click', addConcLoad);
+        concentratedLoadsContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-load-btn')) {
+                document.getElementById(`conc_load_${e.target.dataset.id}`).remove();
+                updateAll();
+            }
+        });
+        
+        document.querySelectorAll('select, input').forEach(input => {
+             input.addEventListener('change', updateAll);
+             input.addEventListener('input', updateAll);
+        });
+        
+        suggestProfileBtn.addEventListener('click', handleSuggestProfile);
+        generateReportBtn.addEventListener('click', handleGenerateReport);
+
+        window.addEventListener('resize', () => {
+             const rect = shearCanvas.parentElement.getBoundingClientRect();
+             [beamCanvas, shearCanvas, momentCanvas].forEach(c => { c.width = rect.width; c.height = c.id === 'beamCanvas' ? 200 : 150; });
+             updateAll();
+        });
+
+    </script>
+
+</body>
+</html>
+
+
+
